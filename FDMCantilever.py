@@ -3,27 +3,27 @@ import mpmath as mp
 
 
 class FDMCantilever:
-    def __init__(self, settingsList, cantileverModifications={}):
+    def __init__(self, cantileverSettings, noElements=100,geomertyMods={}, coatings={},coatingMods={}):
 
         self.cantilever = {
-            'w'  : settingsList["Cantilever Width"],
-            'l'  : settingsList["Cantilever Length"],
-            't'  : settingsList["Cantilever Thickness"],
-            'E'  : settingsList["Cantilever Youngs Modulus"],
-            'vs' : settingsList["Cantilever Possion's Ratio"],
+            'w'  : cantileverSettings["Width"],
+            'l'  : cantileverSettings["Length"],
+            't'  : cantileverSettings["Thickness"],
+            'E'  : cantileverSettings["Youngs Modulus"],
+            'vs' : cantileverSettings["Possion's Ratio"],
         }
+        
 
-        self.noElements = settingsList["Number of Elements"]
+        self.noElements = noElements
         self.noNodes = self.noElements+1
         self.elementLength = self.cantilever["l"]/self.noElements
 
-
-
+        #setup node arrays
         self.nodeXCoords = np.arange(0,self.noNodes,1)*self.elementLength #TODO: variable mesh
         self.nodeCentroidCoords = self.nodeXCoords-(self.elementLength/2) #TODO: variable mesh
         self.nodeCentroidCoords[0] = 0
         
-        self.nodeAlongCantileverCoords = self.nodeXCoords if not settingsList["Part Angle Cantilever"]["PartAngle"] else np.zeros(self.noNodes)
+        self.nodeAlongCantileverCoords = self.nodeXCoords if not cantileverSettings["Part Angle Cantilever"]["PartAngle"] else np.zeros(self.noNodes)
 
         self.baseElementXLenArr = np.ones(self.noNodes)*self.cantilever["l"]
         self.baseElementXLenArr[0] = 0
@@ -34,34 +34,29 @@ class FDMCantilever:
         
         #TODO: Variable mesh
 
-        if cantileverModifications:
-            self.modifyGeometry(cantileverModifications)
+        #Cantilever cutouts /tapers
+        if geomertyMods:
+            self.modify(modDict=geomertyMods, arr=self.widthArr)
 
+        
         self.element2ndMomentOfArea = self.widthArr*self.cantilever['t']**3/12
         self.element2ndMomentOfArea[0] = np.Infinity
 
+        #Coating
+        if coatings:
+            if coatings['Coating']:
+                self.coatings = coatings
+                self.coatingWidthArr=np.asarray([self.coatings['width'] if round(self.nodeCentroidCoords[i],8)>self.coatings['startX'] and round(self.nodeCentroidCoords[i],8)<=self.coatings['endX'] else 0 for i in range(0,self.noNodes,1)])   
+        
+                if coatingMods:
+                    self.modify(modDict=coatingMods, arr=self.coatingWidthArr)
 
-    def modifyGeometry(self,modDict):
+        
+
+    def modify(self, modDict, arr):
         if 'Taper' in modDict.keys() :
             if  modDict['Taper']['Taper']:
-                taper = modDict['Taper']['parameters']
-
-                TM=(self.cantilever['w']-taper['end width'])/(taper['start']-taper['end'])
-
-                # TS_N = ([i for i in range(0,self.noElements) if self.nodeCentroidCoords[i]<=taper['start'] and self.nodeCentroidCoords[i+1]>taper['start']])[0]
-                # print(TS_N)
-                TS_N = next(index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=taper['start'])
-
-
-
-                for i in range(TS_N,self.noNodes,1):
-
-                    if self.nodeCentroidCoords[i]>taper['start'] and self.nodeCentroidCoords[i]<=taper['end']:
-                        self.widthArr[i]=(TM * (self.nodeCentroidCoords[i]-taper['start']) ) + self.cantilever['w']
-                        
-                    elif self.nodeCentroidCoords[i]>taper['end']:
-                        self.widthArr[i]=taper['end width']
-
+                self.addTaper(arr=arr, params=modDict['Taper']['parameters'])
         
         if 'Gaps/Width' in modDict.keys() :
             if modDict['Gaps/Width']["Gap/Width Change"]:
@@ -72,26 +67,32 @@ class FDMCantilever:
                     width = params[key]
                     if not width['active']: 
                         continue 
-                    GM=(width['end change']-width['start change'])/(width['endX']-width['startX'])
-
-                    GS_N=([i for i in range(0,self.noElements,1) if self.nodeCentroidCoords[i]<=width['startX'] and self.nodeCentroidCoords[i+1]>width['startX']])[0]
-                    GE_N=([i if self.nodeCentroidCoords[i-1]<=width['endX'] and self.nodeCentroidCoords[i]>width['endX'] else self.noNodes for i in range(GS_N,self.noNodes,1)])[0] 
-                    print(GS_N)
-                    print(GE_N)
-                    GS_N=next(index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=width['startX'])
-                    GE_N=next((index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=width['endX']),self.noNodes)
-                    print(GS_N)
-                    print(GE_N)
-
-                    for i in range (GS_N,GE_N,1):
-                        if self.nodeCentroidCoords[i]>width['startX'] and self.nodeCentroidCoords[i]<=width['endX']:
-                            self.widthArr[i]=self.widthArr[i]-width['start change']-(GM*(self.nodeCentroidCoords[i]-width['startX']))
-
-
-
-
+                    self.addWidthChange(arr=arr,params=width)
         
 
+    def addTaper(self, arr, params):
+        TM=(self.cantilever['w']-params['end width'])/(params['start']-params['end'])
+        TS_N = next(index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=params['start'])
+
+        for i in range(TS_N,self.noNodes,1):
+
+            if self.nodeCentroidCoords[i]>params['start'] and self.nodeCentroidCoords[i]<=params['end']:
+                arr[i]=(TM * (self.nodeCentroidCoords[i]-params['start']) ) + self.cantilever['w']
+                
+            elif self.nodeCentroidCoords[i]>params['end']:
+                arr[i]=params['end width']
+
+    def addWidthChange(self, arr, params):
+        GM=(params['end change']-params['start change'])/(params['endX']-params['startX'])
+        GS_N=next(index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=params['startX'])
+        GE_N=next((index-1 for index,val in enumerate(self.nodeCentroidCoords) if val>=params['endX']),self.noNodes)
+
+        for i in range (GS_N,GE_N,1):
+            if self.nodeCentroidCoords[i]>params['startX'] and self.nodeCentroidCoords[i]<=params['endX']:
+                arr[i]=arr[i]-params['start change']-(GM*(self.nodeCentroidCoords[i]-params['startX']))
+
+
+    
 
     def derivitave1(self,eq,boundries,interval):
         t=np.linspace(interval[0],interval[-1], self.noElements+1)
@@ -167,7 +168,7 @@ if __name__ == '__main__':
 
 
 
-    do = FDMCantilever(settingsList=settings)
+    do = FDMCantilever(cantileverSettings=settings)
     eq = '-9'
     interval = [0,5]
     boundries = [None] * (interval[-1]+1)
