@@ -49,6 +49,9 @@ class ComputeCurvature:
 
         return self.r  # Return the radius of curvature
 
+    def curvature(self, xx, yy):
+        return 1/self.fit(xx,yy)
+
 
 if __name__=="__main__":
 
