@@ -48,7 +48,7 @@ if __name__ == '__main__':
     geomertyMods = {}  #can be of type 'gap' or 'taper'
 
     geoGapWidth ={
-        "Gap/Width Change" : True
+        "Gap/Width Change" : False
     }
     if geoGapWidth["Gap/Width Change"]:    #add as many gaps as you like
         geoGapWidth.update({
@@ -148,8 +148,9 @@ if __name__ == '__main__':
     variableDict = "mechanical"
     variable = "Force"
     arr = [1e-9,2e-9]
-    # do = FDMCantilever(cantileverSettings=cantileverSettings, noElements=elements, geomertyMods=geomertyMods, coatings=coatings,coatingMods=coatingMods, mechanical=mechanical)
-    do = FDMCantileverSensitivity(variableDict=variableDict,variable=variable,arr=arr,cantileverSettings=cantileverSettings, noElements=elements, geomertyMods=geomertyMods, coatings=coatings,coatingMods=coatingMods, mechanical=mechanical)
+    do = FDMCantilever(cantileverSettings=cantileverSettings, noElements=elements, geomertyMods=geomertyMods, coatings=coatings,coatingMods=coatingMods, mechanical=mechanical)
+    do.doMechanical()
+    # do = FDMCantileverSensitivity(variableDict=variableDict,variable=variable,arr=arr,cantileverSettings=cantileverSettings, noElements=elements, geomertyMods=geomertyMods, coatings=coatings,coatingMods=coatingMods, mechanical=mechanical)
     # eq = '-9'
     # interval = [0,5]
     # boundries = [None] * (interval[-1]+1)

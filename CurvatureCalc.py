@@ -54,10 +54,15 @@ class ComputeCurvature:
 
 
 if __name__=="__main__":
+    import matplotlib.pyplot as plt
 
-    x = np.r_[36, 36, 19, 18, 33, 26]
-    y = np.r_[14, 10, 28, 31, 18, 26]
+    x = np.r_[15, 16, 20, 22, 30, 35]
+    y = np.r_[10, 16, 28, 31, 37, 39]
     comp_curv = ComputeCurvature()
     curvature = comp_curv.fit(x, y)
     print(curvature)
+
+    plt.plot(x,y)
+    plt.plot(comp_curv.xc, comp_curv.yc, 'ro')
+    plt.show()
 

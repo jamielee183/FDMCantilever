@@ -1,5 +1,6 @@
 import numpy as np
 import mpmath as mp
+from CurvatureCalc import ComputeCurvature 
 
 
 class FDMCantilever:
@@ -246,8 +247,18 @@ class FDMCantilever:
             dispUYAlong[i]=np.sum(dispYTotal[0:i+1])
             dispRXYAlong[i]=np.sum(dispR[0:i+1])
 
-    
 
+        curvature = np.zeros(self.noNodes)
+        for i in range(1,self.noNodes-1,1):
+            curvature[i] = ComputeCurvature().curvature(
+                xx=np.r_[self.nodeAlongCantileverCoords[i-1],self.nodeAlongCantileverCoords[i],self.nodeAlongCantileverCoords[i+1]], 
+                yy=np.r_[dispUYAlong[i-1],dispUYAlong[i],dispUYAlong[i+1]]
+                )
+
+        strainArr =-curvature*(self.cantilever['t']/2) 
+        deformedLenAtSurface = (strainArr*self.baseElementXLenArr) + self.baseElementXLenArr
+        print(strainArr)
+        print(deformedLenAtSurface)
         self.mechOut = {
             'spring along' : springAlong,
             'spring total': 1/np.sum(1/springE),
