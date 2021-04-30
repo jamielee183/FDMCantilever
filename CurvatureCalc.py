@@ -40,7 +40,7 @@ class ComputeCurvature:
         self.yy = yy
         # print(type(xx[1]),type(yy[1]))
         center_estimate = np.array([np.mean(xx), np.mean(yy)])
-        center = optimize.leastsq(self.f, center_estimate, Dfun=self.df, col_deriv=True)[0]
+        center = optimize.leastsq(self.f, center_estimate, Dfun=self.df, col_deriv=True, gtol=1e-8)[0]
 
         self.xc, self.yc = center
         ri = self.calc_r(*center)
