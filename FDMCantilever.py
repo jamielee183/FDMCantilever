@@ -249,25 +249,30 @@ class FDMCantilever:
 
 
         curvature = np.zeros(self.noNodes)
+        do = ComputeCurvature()
         for i in range(1,self.noNodes-1,1):
-            curvature[i] = ComputeCurvature().curvature(
+            curvature[i] = do.curvature(
                 xx=np.r_[self.nodeAlongCantileverCoords[i-1],self.nodeAlongCantileverCoords[i],self.nodeAlongCantileverCoords[i+1]], 
                 yy=np.r_[dispUYAlong[i-1],dispUYAlong[i],dispUYAlong[i+1]]
                 )
-
+            
+        #Euler-bernouilli 
         strainArr =-curvature*(self.cantilever['t']/2) 
-        deformedLenAtSurface = (strainArr*self.baseElementXLenArr) + self.baseElementXLenArr
-        print(strainArr)
-        print(deformedLenAtSurface)
+        deformedLenAtSurfaceArr = (strainArr*self.baseElementXLenArr) + self.baseElementXLenArr
+        
         self.mechOut = {
             'spring along' : springAlong,
             'spring total': 1/np.sum(1/springE),
             'disp along Y': dispUYAlong,
             'disp along R': dispRXYAlong,
             'disp end Y' : np.sum(dispYTotal),
+            'strain along Y' : strainArr,
+            'strain total' : np.sum(strainArr),
         }
-        print('spring: ',self.mechOut['spring total'])
-        print('end disp: ',self.mechOut['disp end Y'])
+        # print(1/curvature)
+        print(self.mechOut['strain along Y'])
+        print('spring const: ',self.mechOut['spring total'])
+        print('mechanical disp: ',self.mechOut['disp end Y'])
         # print('disp: ',self.mechOut['disp along Y'])
         return self.mechOut
 
@@ -279,21 +284,41 @@ class FDMCantilever:
 
 
 
-
-
-
-
     def derivitave1(self,eq,boundries,interval):
         t=np.linspace(interval[0],interval[-1], self.noElements+1)
         h = (interval[-1]-interval[0])/self.noElements
 
+        """Input matrix A for [A][y]=[b]"""
+        A[0,0] = 1
+        A[self.noElements,self.noElements] = 1
+        for i in range(1,self.noElements):
+            A[i,i-1]= 1
+            A[i,i] = 0
+            A[i,i+1]= 1
 
 
-    def derivitave2(self, eq, boundries, interval):
+        """output matrix b for [A][y]=[b]"""
+        b = b + (eval(eq) if type(eq) is str else eq) * 2*h 
+
+        for index,boundry in enumerate(boundries):
+            if boundry is not None:
+                b[int(index/h)] = boundry 
+        
+
+        print(A)
+        print(b)
+        return t, np.linalg.solve(A,b)
+
+
+
+    def derivitave2(self, eq, boundries, xAxis=None,interval=None):
         A = np.zeros((self.noNodes,self.noNodes))
         b = np.zeros(self.noNodes)
 
-        t=np.linspace(interval[0],interval[-1], self.noNodes)
+        if interval is not None:
+            t=np.linspace(interval[0],interval[-1], self.noNodes)   
+        if xAxis is not None:
+            t = xAxis
         h = (interval[-1]-interval[0])/self.noElements
 
 
@@ -323,7 +348,13 @@ class FDMCantilever:
 
 class FDMCantileverSensitivity:
     def __init__(self, variableDict, variable, arr=None, lims=None, steps=100, **kwarg):
-        print(f"Sweeping variable {variable} in {variableDict}, from array {arr} ")
+        if (arr is None and lims is None) or (arr is not None and lims is not None):
+            raise NotImplementedError('Array OR limits with number steps, not both (or neither)!')
+
+        if lims is not None:
+            arr = np.linspace(lims[0],lims[1],steps)
+        print(f"Sweeping variable {variableDict} {variable} in {arr} ")
+
 
         if arr is not None:
             out = []
